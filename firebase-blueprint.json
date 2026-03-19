@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "Project": {
+      "title": "Project",
+      "description": "A geological digitalization project.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Project name" },
+        "description": { "type": "string", "description": "Project description" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "ownerId": { "type": "string", "description": "UID of the project owner" }
+      },
+      "required": ["name", "ownerId"]
+    },
+    "GeoFeature": {
+      "title": "GeoFeature",
+      "description": "A digitized geological feature (polygon, line, or point).",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["polygon", "line", "point"] },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" }
+            }
+          }
+        },
+        "properties": { "type": "object", "description": "Metadata like lithology, age, etc." },
+        "projectId": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["type", "points", "projectId", "ownerId"]
+    },
+    "MapLayer": {
+      "title": "MapLayer",
+      "description": "An imported map image layer.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "opacity": { "type": "number" },
+        "visible": { "type": "boolean" },
+        "projectId": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["name", "imageUrl", "projectId", "ownerId"]
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Main project documents"
+    },
+    "/projects/{projectId}/features/{featureId}": {
+      "schema": "GeoFeature",
+      "description": "Digitized features for a project"
+    },
+    "/projects/{projectId}/layers/{layerId}": {
+      "schema": "MapLayer",
+      "description": "Map layers for a project"
+    }
+  }
+}

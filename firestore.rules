@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: projects
+    // Fields: name (string), description (string), createdAt (string), ownerId (string)
+    //
+    // Collection: projects/{projectId}/features
+    // Fields: type (string), points (list), properties (map), projectId (string), ownerId (string)
+    //
+    // Collection: projects/{projectId}/layers
+    // Fields: name (string), imageUrl (string), opacity (number), visible (bool), projectId (string), ownerId (string)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "serignesalioudiouf71@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // --- Domain Validators ---
+
+    function isValidProject(data) {
+      return hasRequiredFields(['name', 'ownerId']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidFeature(data) {
+      return hasRequiredFields(['type', 'points', 'projectId', 'ownerId']) &&
+             data.type in ['polygon', 'line', 'point'] &&
+             data.points is list && data.points.size() < 1000 &&
+             data.projectId is string &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidLayer(data) {
+      return hasRequiredFields(['name', 'imageUrl', 'projectId', 'ownerId']) &&
+             data.name is string && data.name.size() < 100 &&
+             data.imageUrl is string && data.imageUrl.size() < 2000 && // URL limit
+             data.projectId is string &&
+             data.ownerId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /projects/{projectId} {
+      allow read: if isOwner(resource.data.ownerId) || isAdmin();
+      allow create: if isAuthenticated() && isValidProject(request.resource.data);
+      allow update: if isOwner(resource.data.ownerId) && isValidProject(request.resource.data);
+      allow delete: if isOwner(resource.data.ownerId) || isAdmin();
+
+      match /features/{featureId} {
+        allow read: if isOwner(resource.data.ownerId) || isAdmin();
+        allow create: if isAuthenticated() && isValidFeature(request.resource.data);
+        allow update: if isOwner(resource.data.ownerId) && isValidFeature(request.resource.data);
+        allow delete: if isOwner(resource.data.ownerId) || isAdmin();
+      }
+
+      match /layers/{layerId} {
+        allow read: if isOwner(resource.data.ownerId) || isAdmin();
+        allow create: if isAuthenticated() && isValidLayer(request.resource.data);
+        allow update: if isOwner(resource.data.ownerId) && isValidLayer(request.resource.data);
+        allow delete: if isOwner(resource.data.ownerId) || isAdmin();
+      }
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isAdmin();
+    }
+  }
+}
